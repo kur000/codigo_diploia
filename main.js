@@ -1,6 +1,7 @@
 // La instrucción 'import * as THREE from './three.module.js';' 
 // se evita aquí ya que se importó desde el CDN en el HTML.
 // Usaremos la variable global THREE.
+const z_spread = 40;
 
 let scene, camera, renderer, clock, container;
 const images = []; // Array para guardar las texturas/mallas de las imágenes flotantes
@@ -14,7 +15,7 @@ function init() {
 
     // 1.2. Configurar la cámara (Perspectiva)
     camera = new THREE.PerspectiveCamera(
-        75, // Campo de visión (Field of View - FOV)
+        35, // Campo de visión (Field of View - FOV)
         window.innerWidth / window.innerHeight, // Aspect Ratio
         0.1, // Near clipping plane
         1000 // Far clipping plane
@@ -28,19 +29,21 @@ function init() {
     document.body.appendChild(renderer.domElement);
 
     // 1.4. Luz (Importante para ver objetos)
-    const ambientLight = new THREE.AmbientLight(0x404040); // Luz suave
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Luz suave
     scene.add(ambientLight);
-    const pointLight = new THREE.PointLight(0xffffff, 1);
+    const pointLight = new THREE.PointLight(0xffffff, .8);
     pointLight.position.set(5, 5, 5);
     scene.add(pointLight);
 
     // 1.5. Reloj para animaciones con delta time
     clock = new THREE.Clock();
 
-    // 1.6. Ejemplo: Añadir un cubo de prueba
-    addTestCube();
-    addTestCube();
-    addTestCube();
+    // 1.6. Create multiple cubes with different images
+    for (let i = 0; i < 7; i++) {
+        const cube = createImageCube(i);
+        scene.add(cube);
+        images.push(cube);
+    }
 
     // 1.7. Manejar el redimensionamiento de la ventana
     window.addEventListener('resize', onWindowResize, false);
@@ -49,22 +52,41 @@ function init() {
     animate();
 }
 
-// --- 2. CÓDIGO DE PRUEBA ---
-function addTestCube() {
-    // Geometría y material del cubo
-    const geometry = new THREE.BoxGeometry(1, 1, 0.01);
-    const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-    const cube = new THREE.Mesh(geometry, material);
+// Function to get random position within ellipse
+function getRandomPosition() {
+    const angle = Math.random() * Math.PI * 2;
+    const radiusX = Math.random() * 4;
+    const radiusY = Math.random() * 2;
+    return {
+        x: Math.cos(angle) * radiusX,
+        y: Math.sin(angle) * radiusY,
+        z: Math.random() * z_spread - z_spread
+    };
+}
 
-    // Posición aleatoria
-    cube.position.set(
-        Math.random() * 4 - 2,
-        Math.random() * 4 - 2,
-        Math.random() * 4 - 2
-    );
+// Function to create a cube with image textures
+function createImageCube(imageIndex) {
+    const images = ['ARDOR5 COVER DEFINITIVO.png', 'OPERADOR portada.png', 'Synchro PORTADA.png', 'cover presunto cielo1.png', 'ep_tapa.png', 'nueva portada ascuas op 24.png', 'portada finalfinalfinal.png'];
+    const loader = new THREE.TextureLoader();
+    const texture = loader.load(`images/${images[imageIndex % images.length]}`);
+    const textureFlipped = texture.clone();
+    textureFlipped.wrapS = THREE.RepeatWrapping;
+    textureFlipped.repeat.x = -1;
     
-    scene.add(cube);
-    images.push(cube); // Lo añadimos al array de imágenes (por ahora, cubos)
+    const materials = [
+        new THREE.MeshStandardMaterial({color: 0x333333}), // right
+        new THREE.MeshStandardMaterial({color: 0x333333}), // left
+        new THREE.MeshStandardMaterial({color: 0x333333}), // top
+        new THREE.MeshStandardMaterial({color: 0x333333}), // bottom
+        new THREE.MeshStandardMaterial({map: texture}), // front
+        new THREE.MeshStandardMaterial({map: textureFlipped}) // back
+    ];
+    
+    const geometry = new THREE.BoxGeometry(2, 2, 0.001);
+    const cube = new THREE.Mesh(geometry, materials);
+    const position = getRandomPosition();
+    cube.position.set(position.x, position.y, position.z);
+    return cube;
 }
 
 // --- 3. CICLO DE RENDERIZADO (Loop principal) ---
@@ -76,8 +98,7 @@ function animate() {
     // Animación de los objetos (simulando flotar/nubes)
     images.forEach(img => {
         // Rotación sutil
-        // img.rotation.x += Math.cos(0.1) * delta/10;
-        img.rotation.y += Math.sin(0.15) * delta/100;
+        img.rotation.y = Math.sin(clock.elapsedTime * .005) * (Math.PI / 4); // ±45 grados
         
         // Movimiento muy lento para simular 'flotar' (opcional)
         img.position.x += Math.sin(clock.elapsedTime * 0.1) * 0.001; 
