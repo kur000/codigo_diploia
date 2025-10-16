@@ -47,7 +47,11 @@ function init() {
 
     // 1.7. Manejar el redimensionamiento de la ventana
     window.addEventListener('resize', onWindowResize, false);
-    
+    const initZ=camera.position.z,
+    furthestZ=images.reduce((b,o)=>Math.abs(o.position.z-initZ)>Math.abs(b-initZ)?o.position.z:b,images[0].position.z),
+    minZ=Math.min(initZ,furthestZ),
+    maxZ=Math.max(initZ,furthestZ);
+    window.addEventListener('wheel',e=>{camera.position.z=Math.min(maxZ,Math.max(minZ,camera.position.z+e.deltaY*0.02));},{passive:true});
     // 1.8. Iniciar el ciclo de renderizado (loop)
     animate();
 }
