@@ -1,0 +1,31 @@
+{
+  "name": "maqueta3js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kur000/codigo_diploia.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kur000/codigo_diploia/issues"
+  },
+  "homepage": "https://github.com/kur000/codigo_diploia#readme",
+  "dependencies": {
+    "cloudinary": "^2.7.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.1",
+    "multer": "^2.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

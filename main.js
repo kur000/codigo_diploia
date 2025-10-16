@@ -49,7 +49,7 @@ function init() {
     window.addEventListener('resize', onWindowResize, false);
 
     // Calcular límites de Z entre la vista inicial y la imagen más lejana
-    const initZ = camera.position.z;
+    let initZ = 0; // Z inicial de la cámara para clamp dinámico
     const furthestZ = images.reduce((acc, m) => m.position.z < acc ? m.position.z : acc, images[0].position.z);
     const minZ = Math.min(initZ, furthestZ);
     const maxZ = Math.max(initZ, furthestZ);
@@ -75,6 +75,62 @@ function init() {
     // Movimiento en Z con rueda, limitado entre minZ y maxZ
     window.addEventListener('wheel', (e) => {
         const sensitivity = 0.02; // rueda arriba (deltaY negativo) avanza en Z
+        camera.position.z = THREE.MathUtils.clamp(
+            camera.position.z + e.deltaY * sensitivity,
+            minZ,
+            maxZ
+        );
+    });
+
+    // PointerLockControls y listeners de clic derecho (ya existentes)
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+    });
+    window.addEventListener('drop', async (e) => {
+        e.preventDefault();
+
+        // Unlock pointer if locked to allow drop interaction
+        if (controls && controls.isLocked) controls.unlock();
+
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!file || !file.type || !file.type.startsWith('image/')) return;
+
+        // Immediate preview using local ObjectURL
+        const previewUrl = URL.createObjectURL(file);
+        const cube = addImageCubeFromUrl(previewUrl);
+
+        // Attempt server upload; swap texture to Cloudinary URL on success
+        try {
+            const fd = new FormData();
+            fd.append('image', file);
+            const resp = await fetch('/api/upload', { method: 'POST', body: fd });
+            const data = await resp.json();
+
+            if (data && data.imageUrl) {
+                const loader = new THREE.TextureLoader();
+                loader.crossOrigin = 'anonymous';
+                const newTex = loader.load(data.imageUrl);
+                const newTexFlipped = newTex.clone();
+                newTexFlipped.wrapS = THREE.RepeatWrapping;
+                newTexFlipped.repeat.x = -1;
+
+                cube.material[4].map = newTex;         // front
+                cube.material[5].map = newTexFlipped;  // back
+                cube.material[4].map.needsUpdate = true;
+                cube.material[5].map.needsUpdate = true;
+            }
+        } catch (err) {
+            // If upload fails, keep the local preview texture
+            console.warn('Upload failed, kept local preview:', err);
+        }
+    });
+
+    // Wheel Z movement with dynamic clamp to include newly added images
+    window.addEventListener('wheel', (e) => {
+        const sensitivity = 0.02; // scroll up (negative deltaY) moves forward (deeper)
+        const furthestZ = getFurthestZ();
+        const minZ = Math.min(initZ, furthestZ);
+        const maxZ = Math.max(initZ, furthestZ);
         camera.position.z = THREE.MathUtils.clamp(
             camera.position.z + e.deltaY * sensitivity,
             minZ,
@@ -154,9 +210,42 @@ function onWindowResize() {
 // --- INICIAR EL SITIO ---
 init();
 
-// ----------------------------------------------------------------------
-// PRÓXIMOS PASOS:
-// 1. Crear una función para cargar y mostrar una imagen real (textura).
-// 2. Implementar la distribución aleatoria en un volumen más grande.
-// 3. Aplicar los efectos de profundidad (opacidad/blur).
-// 4. Implementar el control de cámara (ej. OrbitControls de Three.js).
+
+
+function getFurthestZ() {
+    if (images.length === 0) return initZ;
+    return images.reduce((acc, m) => m.position.z < acc ? m.position.z : acc, images[0].position.z);
+}
+
+function addImageCubeFromUrl(url) {
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+
+    const texture = loader.load(url);
+    const textureFlipped = texture.clone();
+    textureFlipped.wrapS = THREE.RepeatWrapping;
+    textureFlipped.repeat.x = -1;
+
+    const materials = [
+        new THREE.MeshStandardMaterial({ color: 0x333333 }), // right
+        new THREE.MeshStandardMaterial({ color: 0x333333 }), // left
+        new THREE.MeshStandardMaterial({ color: 0x333333 }), // top
+        new THREE.MeshStandardMaterial({ color: 0x333333 }), // bottom
+        new THREE.MeshStandardMaterial({ map: texture }),    // front
+        new THREE.MeshStandardMaterial({ map: textureFlipped }) // back
+    ];
+
+    const geometry = new THREE.BoxGeometry(2, 2, 0.001);
+    const cube = new THREE.Mesh(geometry, materials);
+
+    // Place in front of camera for immediate visibility
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    const distance = 4;
+    const pos = camera.position.clone().add(forward.multiplyScalar(distance));
+    cube.position.copy(pos);
+
+    scene.add(cube);
+    images.push(cube);
+    return cube;
+}
