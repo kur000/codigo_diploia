@@ -3,7 +3,7 @@
 // Usaremos la variable global THREE.
 const z_spread = 40;
 
-let scene, camera, renderer, clock, container;
+let scene, camera, renderer, clock, container, controls;
 const images = []; // Array para guardar las texturas/mallas de las imágenes flotantes
 
 // --- 1. FUNCIÓN DE INICIALIZACIÓN ---
@@ -11,7 +11,7 @@ function init() {
     // 1.1. Configurar la escena
     scene = new THREE.Scene();
     // Puedes cambiar el fondo para que sea más 'latente' o 'atmosférico'
-    scene.background = new THREE.Color(0x0a0a0a); 
+    scene.background = new THREE.Color(0x0f0f0f); 
 
     // 1.2. Configurar la cámara (Perspectiva)
     camera = new THREE.PerspectiveCamera(
@@ -45,13 +45,43 @@ function init() {
         images.push(cube);
     }
 
-    // 1.7. Manejar el redimensionamiento de la ventana
+    // 1.7. Controles de cámara (FirstPersonControls) y límites de zoom
     window.addEventListener('resize', onWindowResize, false);
-    const initZ=camera.position.z,
-    furthestZ=images.reduce((b,o)=>Math.abs(o.position.z-initZ)>Math.abs(b-initZ)?o.position.z:b,images[0].position.z),
-    minZ=Math.min(initZ,furthestZ),
-    maxZ=Math.max(initZ,furthestZ);
-    window.addEventListener('wheel',e=>{camera.position.z=Math.min(maxZ,Math.max(minZ,camera.position.z+e.deltaY*0.02));},{passive:true});
+
+    // Calcular límites de Z entre la vista inicial y la imagen más lejana
+    const initZ = camera.position.z;
+    const furthestZ = images.reduce((acc, m) => m.position.z < acc ? m.position.z : acc, images[0].position.z);
+    const minZ = Math.min(initZ, furthestZ);
+    const maxZ = Math.max(initZ, furthestZ);
+
+    // PointerLockControls para POV con clic derecho
+    controls = new THREE.PointerLockControls(camera, renderer.domElement);
+    // Bloquear menú contextual para clic derecho fluido
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+    // Lock al presionar clic derecho; unlock al soltar o salir del canvas
+    renderer.domElement.addEventListener('mousedown', (e) => {
+        if (e.button === 2) {
+            controls.lock();
+            e.preventDefault();
+        }
+    });
+    renderer.domElement.addEventListener('mouseup', (e) => {
+        if (controls.isLocked) controls.unlock();
+    });
+    renderer.domElement.addEventListener('mouseleave', () => {
+        if (controls.isLocked) controls.unlock();
+    });
+
+    // Movimiento en Z con rueda, limitado entre minZ y maxZ
+    window.addEventListener('wheel', (e) => {
+        const sensitivity = 0.02; // rueda arriba (deltaY negativo) avanza en Z
+        camera.position.z = THREE.MathUtils.clamp(
+            camera.position.z + e.deltaY * sensitivity,
+            minZ,
+            maxZ
+        );
+    });
+
     // 1.8. Iniciar el ciclo de renderizado (loop)
     animate();
 }
@@ -107,7 +137,10 @@ function animate() {
         // Movimiento muy lento para simular 'flotar' (opcional)
         img.position.x += Math.sin(clock.elapsedTime * 0.1) * 0.001; 
     });
-
+    // FirstPersonControls requiere delta
+    if (controls && typeof controls.update === 'function') {
+        controls.update(delta);
+    }
     renderer.render(scene, camera);
 }
 
